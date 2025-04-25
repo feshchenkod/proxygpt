@@ -34,17 +34,15 @@ if __name__ == '__main__':
     bot_token = os.getenv("TG_TOKEN")
     application = ApplicationBuilder().token(bot_token).build()
 
-    start_handler = CommandHandler('start', start)
-    ping_handler = CommandHandler('ping', ping)
-    random_handler = CommandHandler('random', random)
-    gpt_handler = CommandHandler('gpt', gpt)
-    talk_handler = CommandHandler('talk', talk)
-    quiz_handler = CommandHandler('quiz', quiz)
-    application.add_handler(start_handler)
-    application.add_handler(ping_handler)
-    application.add_handler(random_handler)
-    application.add_handler(gpt_handler)
-    application.add_handler(talk_handler)
-    application.add_handler(quiz_handler)
+    handlers = [
+        CommandHandler('start', start),
+        CommandHandler('ping', ping),
+        CommandHandler('random', random),
+        CommandHandler('gpt', gpt),
+        CommandHandler('talk', talk),
+        CommandHandler('quiz', quiz),
+    ]
+    for handler in handlers:
+        application.add_handler(handler)
 
     application.run_polling()
