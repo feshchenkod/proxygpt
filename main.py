@@ -1,7 +1,7 @@
+import os
 import logging
 from dotenv import load_dotenv
-import os
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import ApplicationBuilder
 from handlers import handlers
 
 load_dotenv()
