@@ -5,7 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from telegram.constants import ChatAction
 from classes import gpt_client
-from misc import read_text, read_image
+from misc import read_text, read_image, random_keyboard, gpt_keyboard
 
 ASK_GPT, TALK, QUIZ = range(3)
 
@@ -19,6 +19,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await random(update, context)
     elif query.data == '/gpt':
         await gpt(update, context)
+    elif query.data == '/talk':
+        await talk(update, context)
     else:
         await query.edit_message_caption(caption="Неизвестная команда.")
 
@@ -33,13 +35,7 @@ async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     response = await gpt_client.text_request('random')
-    keyboard = [
-        [
-            InlineKeyboardButton('Хочу еще факт', callback_data='/random'),
-            InlineKeyboardButton('Закончить', callback_data='/start'),
-        ]
-    ]
-    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=response, photo=photo, reply_markup=InlineKeyboardMarkup(keyboard))
+    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=response, photo=photo, reply_markup=random_keyboard())
 
 async def gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = await read_text('messages', 'gpt.txt')
@@ -57,7 +53,7 @@ async def gpt_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton('Закончить', callback_data='/start'),
         ]
     ]
-    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=response, photo=photo, reply_markup=InlineKeyboardMarkup(keyboard))
+    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=response, photo=photo, reply_markup=gpt_keyboard())
 
 async def talk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Nothing here, try later...")
@@ -73,6 +69,13 @@ handlers = [
         entry_points=[CommandHandler('gpt', gpt)],
         states={
             ASK_GPT: [MessageHandler(filters.TEXT & ~filters.COMMAND, gpt_input)],
+        },
+        fallbacks=[CommandHandler('start', start)],
+    ),
+    ConversationHandler(
+        entry_points=[CommandHandler('talk', talk)],
+        states={
+            TALK: [MessageHandler(filters.TEXT & ~filters.COMMAND, talk_input)],
         },
         fallbacks=[CommandHandler('start', start)],
     ),

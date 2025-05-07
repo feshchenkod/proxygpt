@@ -12,3 +12,8 @@ async def read_image(resource_name: str):
     async with aiofiles.open(path, 'rb') as file:
         image = await file.read()
     return image
+
+def load_prompts_list(prompt_starts):
+    prompts_path = os.path.join('resources', 'prompts')
+    prompts_list = [file for file in os.listdir(prompts_path) if file.startswith(prompt_starts)]
+    return prompts_list
