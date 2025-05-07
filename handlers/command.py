@@ -5,6 +5,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from classes import gpt_client
 
+ASK_GPT, TALK, QUIZ = range(3)
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -13,17 +15,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
     elif query.data == '/random':
         await random(update, context)
+    elif query.data == '/gpt':
+        await gpt(update, context)
     else:
         await query.edit_message_caption(caption="Неизвестная команда.")
-
-async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text
-    await update.message.reply_text(f"Ты написал: {user_message}")
-    return ConversationHandler.END  # заканчиваем диалог
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Отменено.")
-    return ConversationHandler.END
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_path = os.path.join('resources', 'messages', 'main.txt')
@@ -53,15 +48,24 @@ async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_path = os.path.join('resources', 'messages', 'gpt.txt')
-    photo_path = os.path.join('resources', 'images', 'gpt.jpg')
     async with aiofiles.open(message_path, 'r') as file:
         message = await file.read()
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+    return ASK_GPT
+
+async def gpt_handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    photo_path = os.path.join('resources', 'images', 'gpt.jpg')
     async with aiofiles.open(photo_path, 'rb') as file:
         photo = await file.read()
-    await update.message.reply_text(message)
     user_text = update.message.text
     response = await gpt_client.text_request('gpt', user_text)
-    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=response, photo=photo)
+    keyboard = [
+        [
+            InlineKeyboardButton('Есть еще вопрос', callback_data='/gpt'),
+            InlineKeyboardButton('Закончить', callback_data='/start'),
+        ]
+    ]
+    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=response, photo=photo, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def talk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Nothing here, try later...")
@@ -73,7 +77,13 @@ handlers = [
     CallbackQueryHandler(button_handler),
     CommandHandler('start', start),
     CommandHandler('random', random),
-    CommandHandler('gpt', gpt),
+    ConversationHandler(
+        entry_points=[CommandHandler('gpt', gpt)],
+        states={
+            ASK_GPT: [MessageHandler(filters.TEXT & ~filters.COMMAND, gpt_handle)],
+        },
+        fallbacks=[CommandHandler('start', start)],
+    ),
     CommandHandler('talk', talk),
     CommandHandler('quiz', quiz),
 ]
