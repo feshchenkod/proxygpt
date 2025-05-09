@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
+from misc import read_text
 
 load_dotenv()
 
@@ -18,13 +19,24 @@ class ChatGPT:
         )
 
     @staticmethod
-    def _load_prompt(prompt_name: str) -> str:
-        prompt_path = os.path.join('resources', 'prompts', f'{prompt_name}.txt')
-        with open(prompt_path) as file:
-            prompt = file.read()
-        return prompt
+    async def _load_prompt(prompt_name: str) -> str:
+        return await read_text('prompts', f'{prompt_name}.txt')
 
     async def text_request(self, prompt_name: str, user_prompt=None) -> str:
+        if user_prompt is None:
+            response = await self._client.responses.create(
+                model="gpt-3.5-turbo",
+                input=await self._load_prompt(prompt_name),
+            )
+        else:
+            response = await self._client.responses.create(
+                model="gpt-3.5-turbo",
+                instructions=await self._load_prompt(prompt_name),
+                input=user_prompt,
+            )
+        return response.output_text
+
+    async def dialog(self, prompt_name: str, user_prompt=None) -> str:
         if user_prompt is None:
             response = await self._client.responses.create(
                 model="gpt-3.5-turbo",
