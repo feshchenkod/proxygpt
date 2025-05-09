@@ -59,6 +59,7 @@ async def gpt_restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def talk(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["messages"] = []
     message = await read_text('messages', 'talk.txt')
     photo = await read_image('talk.jpg')
     keyboard = await talk_keyboard()
@@ -71,6 +72,7 @@ async def talk_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     personality = query.data
     context.user_data["personality"] = personality
     prompt = await read_text('prompts', f'{personality}.txt')
+    context.user_data["messages"] = [{"role": "system", "content": prompt}]
     name = prompt.split(', ')[0][5:]
     photo = await read_image(f'{personality}.jpg')
     await context.bot.send_photo(chat_id=update.effective_chat.id, caption=f"Вы выбрали: {name}. Напишите ваш вопрос:", photo=photo, reply_markup=talk_choose_keyboard())
@@ -80,8 +82,10 @@ async def talk_ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     personality = context.user_data.get("personality")
     photo = await read_image(f'{personality}.jpg')
     user_text = update.message.text
+    context.user_data["messages"].append({"role": "user", "content": user_text})
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    response = await gpt_client.text_request(f'{personality}', user_text)
+    response = await gpt_client.dialog(context.user_data["messages"])
+    context.user_data["messages"].append({"role": "assistant", "content": response})
     await context.bot.send_photo(chat_id=update.effective_chat.id, caption=response, photo=photo, reply_markup=talk_choose_keyboard())
     return TALK_ASK
 

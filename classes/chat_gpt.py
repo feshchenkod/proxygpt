@@ -36,16 +36,9 @@ class ChatGPT:
             )
         return response.output_text
 
-    async def dialog(self, prompt_name: str, user_prompt=None) -> str:
-        if user_prompt is None:
-            response = await self._client.responses.create(
-                model="gpt-3.5-turbo",
-                input=self._load_prompt(prompt_name),
-            )
-        else:
-            response = await self._client.responses.create(
-                model="gpt-3.5-turbo",
-                instructions=self._load_prompt(prompt_name),
-                input=user_prompt,
-            )
-        return response.output_text
+    async def dialog(self, messages) -> str:
+        completion = await self._client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages
+        )
+        return completion.choices[0].message.content
