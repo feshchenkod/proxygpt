@@ -2,9 +2,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from telegram.constants import ChatAction
 from classes import gpt_client
-from misc import read_text, read_image, random_keyboard, gpt_keyboard, talk_keyboard, talk_choose_keyboard
+from misc import read_text, read_image, random_keyboard, gpt_keyboard, talk_keyboard, talk_choose_keyboard, quiz_keyboard, quiz_answer_keyboard
 
-ASK_GPT, TALK_CHOOSE, TALK_ASK, QUIZ = range(4)
+ASK_GPT, TALK_CHOOSE, TALK_ASK, QUIZ, QUIZ_CHOOSE, QUIZ_ANSWER = range(6)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -18,6 +18,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await gpt(update, context)
     elif query.data == '/talk':
         await talk(update, context)
+    elif query.data == '/quiz':
+        await quiz(update, context)
     else:
         await query.edit_message_caption(caption="Неизвестная команда.")
 
@@ -94,7 +96,42 @@ async def talk_restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Nothing here, try later...")
+    message = await read_text('messages', 'quiz.txt')
+    photo = await read_image('quiz.jpg')
+    prompt = await read_text('prompts', 'quiz.txt')
+    context.user_data["messages"] = [{"role": "system", "content": prompt}]
+    context.user_data["photo"] = photo
+    context.user_data["score"] = 0
+    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=message, photo=photo, reply_markup=quiz_keyboard())
+    return QUIZ_CHOOSE
+
+async def quiz_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    quiz_theme = query.data
+    context.user_data["messages"].append({"role": "user", "content": quiz_theme})
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    response = await gpt_client.dialog(context.user_data["messages"])
+    context.user_data["messages"].append({"role": "assistant", "content": response})
+    photo = context.user_data["photo"]
+    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=response, photo=photo, reply_markup=quiz_answer_keyboard())
+    return QUIZ_ANSWER
+
+async def quiz_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    context.user_data["messages"].append({"role": "user", "content": user_text})
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    response = await gpt_client.dialog(context.user_data["messages"])
+    if response =="Правильно!":
+        context.user_data["score"] += 1
+    context.user_data["messages"].append({"role": "assistant", "content": response})
+    photo = context.user_data["photo"]
+    await context.bot.send_photo(chat_id=update.effective_chat.id,caption=f'{response}\n Счет: {context.user_data["score"]}', photo=photo,reply_markup=quiz_keyboard())
+    return QUIZ_CHOOSE
+
+async def quiz_restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await quiz(update, context)
+    return ConversationHandler.END
 
 fallbacks=[
             CommandHandler('cancel', cancel),
@@ -102,7 +139,7 @@ fallbacks=[
             CommandHandler('random', random_restart),
             CommandHandler('gpt', gpt_restart),
             CommandHandler('talk', talk_restart),
-            CommandHandler('quiz', quiz),
+            CommandHandler('quiz', quiz_restart),
         ]
 
 handlers = [
@@ -121,9 +158,13 @@ handlers = [
         allow_reentry=True,
     ),
     ConversationHandler(
-        entry_points=[CommandHandler("talk", talk), CommandHandler("talk", talk_restart)],
+        entry_points=[
+            CommandHandler("talk", talk), CommandHandler("talk", talk_restart)],
         states={
-            TALK_CHOOSE: [CallbackQueryHandler(talk_choose)],
+            TALK_CHOOSE: [
+                CallbackQueryHandler(talk_choose),
+                CallbackQueryHandler(cancel, pattern="^cancel"),
+            ],
             TALK_ASK: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, talk_ask),
                 CallbackQueryHandler(talk, pattern="^talk_restart$"),
@@ -133,6 +174,27 @@ handlers = [
         fallbacks=fallbacks,
         allow_reentry=True,
     ),
-    CommandHandler('quiz', quiz),
+    ConversationHandler(
+        entry_points=
+        [
+            CommandHandler("quiz", quiz),
+            CommandHandler("quiz", quiz_restart),
+            CallbackQueryHandler(quiz, pattern="^quiz_restart$"),
+            CallbackQueryHandler(cancel, pattern="^cancel"),
+        ],
+        states={
+            QUIZ_CHOOSE: [
+                CallbackQueryHandler(quiz_choose),
+                CallbackQueryHandler(cancel, pattern="^cancel"),
+            ],
+            QUIZ_ANSWER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, quiz_answer),
+                CallbackQueryHandler(quiz, pattern="^quiz_restart$"),
+                CallbackQueryHandler(cancel, pattern="^cancel"),
+            ],
+        },
+        fallbacks=fallbacks,
+        allow_reentry=True,
+    ),
     CallbackQueryHandler(button_handler),
 ]
