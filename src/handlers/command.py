@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from telegram.constants import ChatAction
 from classes import gpt_client
-from misc import read_text, read_image, random_keyboard, gpt_keyboard, talk_keyboard, talk_choose_keyboard, quiz_keyboard, quiz_answer_keyboard
+from misc import read_text, read_image, random_keyboard, gpt_keyboard, talk_keyboard, talk_choose_keyboard, quiz_init_keyboard, quiz_keyboard, quiz_answer_keyboard
 
 ASK_GPT, TALK_CHOOSE, TALK_ASK, QUIZ, QUIZ_CHOOSE, QUIZ_ANSWER = range(6)
 
@@ -102,7 +102,7 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["messages"] = [{"role": "system", "content": prompt}]
     context.user_data["photo"] = photo
     context.user_data["score"] = 0
-    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=message, photo=photo, reply_markup=quiz_keyboard())
+    await context.bot.send_photo(chat_id=update.effective_chat.id, caption=message, photo=photo, reply_markup=quiz_init_keyboard())
     return QUIZ_CHOOSE
 
 async def quiz_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):

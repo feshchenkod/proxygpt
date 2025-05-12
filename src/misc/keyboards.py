@@ -36,6 +36,18 @@ def talk_choose_keyboard():
         ]
     ])
 
+def quiz_init_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton('Программирование', callback_data='quiz_prog'),
+            InlineKeyboardButton('Математика', callback_data='quiz_math'),
+        ],
+        [
+            InlineKeyboardButton('Биология', callback_data='quiz_biology'),
+            InlineKeyboardButton('Закончить', callback_data='cancel'),
+        ]
+    ])
+
 def quiz_keyboard():
     return InlineKeyboardMarkup([
         [
